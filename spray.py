@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import logging
 import mimetypes
+import os
 import os.path
 import sys
 
@@ -17,30 +18,36 @@ import yaml
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-d', '--debug', help='debugging output', action='store_true')
+subparsers = parser.add_subparsers(help='subcommands')
 
-args_server = parser.add_argument_group('Run the web server')
-args_server.add_argument('run_server', help='run server')
+args_server = subparsers.add_parser('run_server', help='run server')
 args_server.add_argument('-b', '--bind', default='localhost:8080', help='bind ip:port')
 args_server.add_argument('-m', '--mode', default='developer', choices=['developer', 'production'], help='developer or production mode')
+args_server.add_argument('-p', '--path', help='spray path', default=os.getcwd())
+args_server.set_defaults(action='run_server')
+
+args_create = subparsers.add_parser('create_project', help='create a project')
+args_create.add_argument('-n', '--name', required=True, help='project name')
+args_create.set_defaults(action='create_project')
 
 args = parser.parse_args()
 
 log_format = '%(levelname)s: %(message)s'
 logging.basicConfig(format=log_format, level=logging.DEBUG if args.debug else logging.ERROR)
 
-try:
-    yaml_file = os.path.abspath('spray.yaml')
-    logging.debug('Loading yaml file {filename}'.format(filename=yaml_file))
-    with open(yaml_file) as fh:
-        conf = yaml.load(fh)
-except IOError:
-    logging.error('spray.yaml not found')
-    sys.exit(1)
-except yaml.scanner.ScannerError as e:
-    logging.error('spray.yaml not proper YAML syntax')
-    sys.exit(1)
-
 def run_server():
+    try:
+        yaml_file = os.path.abspath('spray.yaml')
+        logging.debug('Loading yaml file {filename}'.format(filename=yaml_file))
+        with open(yaml_file) as fh:
+            conf = yaml.load(fh)
+    except IOError:
+        logging.error('spray.yaml not found')
+        sys.exit(1)
+    except yaml.scanner.ScannerError as e:
+        logging.error('spray.yaml not proper YAML syntax')
+        sys.exit(1)
+
     mimetypes.init()
     app = Flask(__name__)
     app.jinja_env.add_extension('pyjade.ext.jinja.PyJadeExtension')
@@ -114,5 +121,25 @@ def run_server():
     elif args.mode == 'production':
         app.run(debug=args.debug, host=host, port=port)
 
-if 'run_server' in args:
+
+def create_project():
+    dest = os.path.abspath(args.name)
+    if os.path.exists(dest):
+        logging.error('Project destination {dest} already exists'.format(dest=dest))
+        sys.exit(1)
+    logging.info('Creating new project at {dest}'.format(dest=dest))
+    os.mkdir(dest)
+    logging.info('Creating spray.yaml file')
+    with open(os.path.join(dest, 'spray.yaml'), 'w') as fh:
+        fh.write('')
+    logging.info('Creating templates directory')
+    os.mkdir(os.path.join(dest, 'templates'))
+    logging.info('Creating static directory')
+    os.mkdir(os.path.join(dest, 'static'))
+    logging.info('Creating cache directory')
+    os.mkdir(os.path.join(dest, 'cache'))
+
+if args.action == 'run_server':
     run_server()
+elif args.action == 'create_project':
+    create_project()
