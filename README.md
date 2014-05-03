@@ -74,4 +74,18 @@ Work in development or production mode
             --bind=0.0.0.0:8080
 
 
+## Serving And Caching Under The Hood
+
+Requests are served by looking for the matching file in `static/`, then as a
+flask route if the static file does not exist. Content-Type headers are 
+determined by an extension: mime type dictionary. Though by default all route
+based requests will be served the `text/html` Content-Type header.
+
+In development mode the server will never use caching. Perhaps in the future it
+will constantly watch the `templates/` and `static/` directories.
+
+In production, each request will be cached in `cache/`. The cache key will 
+simply be the request path. Even if the template or static file is updated in
+the file system, the cache will not be invalidated and updated. In this case the
+server must be restart.
 
