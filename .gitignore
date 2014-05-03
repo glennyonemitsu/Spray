@@ -52,3 +52,9 @@ coverage.xml
 # Sphinx documentation
 docs/_build/
 
+# spray project specific
+templates/
+cache/
+static/
+spray.yaml
+.python-version
