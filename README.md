@@ -76,10 +76,10 @@ Work in development or production mode
 
 ## Serving And Caching Under The Hood
 
-Requests are served by looking for the matching file in `static/`, then as a
-flask route if the static file does not exist. Content-Type headers are 
-determined by an extension: mime type dictionary. Though by default all route
-based requests will be served the `text/html` Content-Type header.
+Requests are served by looking for the matching flask route, then as a file in
+`static/` if the route does not exist. Content-Type headers are determined by 
+an extension: mime type dictionary. Though by default all route based requests
+will be served the `text/html` Content-Type header.
 
 In development mode the server will never use caching. Perhaps in the future it
 will constantly watch the `templates/` and `static/` directories.
