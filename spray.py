@@ -9,7 +9,8 @@ import os
 import os.path
 import sys
 
-from flask import abort, Flask, make_response, render_template, request
+from flask import abort, Flask, make_response, render_template, request, \
+    send_file
 from gunicorn.app.base import Application
 from gunicorn.arbiter import Arbiter
 from gunicorn.config import Config
@@ -35,7 +36,7 @@ args = parser.parse_args()
 log_format = '%(levelname)s: %(message)s'
 logging.basicConfig(format=log_format, level=logging.DEBUG if args.debug else logging.ERROR)
 
-def run_server():
+def create_app():
     try:
         serve_path = os.path.abspath(args.path)
         yaml_file = os.path.join(serve_path, 'spray.yaml')
@@ -73,20 +74,19 @@ def run_server():
         cache_file = os.path.abspath(os.path.join(serve_path, 'cache', cache_key))
         logging.debug('Checking for cache key "{key}" for request path "{path}"'.format(key=cache_key, path=request.path))
         if os.path.exists(cache_file):
-            logging.debug('Found cache key "{key}"'.format(key=cache_key))
-            data = app.send_static_file(cache_file)
-            return make_response(data, 200)
+            logging.debug('Found cache file "{key}"'.format(key=cache_file))
+            return send_file(cache_file, mimetype=mimetypes.guess_type(request.path)[0])
         else:
             logging.debug('Did not find cache key "{key}"'.format(key=cache_key))
 
     @app.after_request
     def cache_recorder(response):
-        return response
         hasher = hashlib.new('sha1')
         hasher.update(request.path)
         cache_key = hasher.hexdigest()
         cache_file = os.path.abspath(os.path.join(serve_path, 'cache', cache_key))
         if not os.path.exists(cache_file):
+            response.direct_passthrough = False
             with open(cache_file, 'w') as fh:
                 fh.write(response.get_data())
         return response
@@ -117,13 +117,7 @@ def run_server():
         return make_response(data, 200)
 
     app.add_url_rule('/<path:path>', 'catchall', catchall_view)
-
-    host = ''.join(args.bind.split(':')[:-1])
-    port = int(args.bind.split(':')[-1])
-    if args.mode == 'developer':
-        app.run(debug=args.debug, host=host, port=port)
-    elif args.mode == 'production':
-        app.run(debug=args.debug, host=host, port=port)
+    return app
 
 
 def create_file(*args):
@@ -145,11 +139,7 @@ def create_project():
         logging.error('Project destination {dest} already exists'.format(dest=dest))
         sys.exit(1)
     create_directory(dest)
-    create_file(dest, 'spray.yaml', '''
-/:
-    template: home.jade
-    name: home
-    '''.strip())
+    create_file(dest, 'spray.yaml', '/:\n    template: home.jade\n    name: home')
     for path in ('templates', 'static', 'cache'):
         create_directory(dest, path)
     create_file(dest, 'templates', 'home.jade', 'h1 Hello, World!')
@@ -157,6 +147,13 @@ def create_project():
 
 
 if args.action == 'run_server':
-    run_server()
+    app = create_app()
+    host = ''.join(args.bind.split(':')[:-1])
+    port = int(args.bind.split(':')[-1])
+    if args.mode == 'developer':
+        app.run(debug=args.debug, host=host, port=port)
+    elif args.mode == 'production':
+        app.run(debug=args.debug, host=host, port=port)
+
 elif args.action == 'create_project':
     create_project()
