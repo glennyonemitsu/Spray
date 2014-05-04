@@ -20,18 +20,18 @@ import yaml
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-d', '--debug', help='debugging output', action='store_true')
-subparsers = parser.add_subparsers(help='subcommands')
+subparsers = parser.add_subparsers(help='Spray command actions')
 
-args_server = subparsers.add_parser('run_server', help='run server')
-args_server.add_argument('-b', '--bind', default='localhost:8080', help='bind ip:port')
-args_server.add_argument('-m', '--mode', default='developer', choices=['developer', 'production'], help='developer or production mode')
-args_server.add_argument('-p', '--path', help='spray path', default=os.getcwd())
-args_server.add_argument('-c', '--cache', help='use cache', default=False, action='store_true')
+args_server = subparsers.add_parser('run', help='Run the web server')
+args_server.add_argument('-b', '--bind', default='localhost:8080', help='Bind server to ip:port')
+args_server.add_argument('-m', '--mode', default='development', choices=['development', 'production'], help='Deployment mode development or production mode')
+args_server.add_argument('-p', '--path', help='Spray path', default=os.getcwd())
+args_server.add_argument('-c', '--cache', help='Use cache for development mode. This is always on for production mode', default=False, action='store_true')
 args_server.set_defaults(action='run_server')
 
-args_create = subparsers.add_parser('create_project', help='create a project')
-args_create.add_argument('-n', '--name', required=True, help='project name')
-args_create.set_defaults(action='create_project')
+args_create = subparsers.add_parser('create', help='Create a new Spray project')
+args_create.add_argument('-n', '--name', required=True, help='Project name')
+args_create.set_defaults(action='create')
 
 args = parser.parse_args()
 
@@ -122,8 +122,7 @@ def create_app(args):
             logging.debug('Did not find static file {filename}'.format(filename=static_file))
             return abort(404)
         logging.debug('Found static file {filename}'.format(filename=static_file))
-        data = app.send_static_file(path)
-        return make_response(data, 200)
+        return send_file(static_file, mimetype=mimetypes.guess_type(request.path)[0])
 
     app.add_url_rule('/<path:path>', 'catchall', catchall_view)
     return app
@@ -159,7 +158,7 @@ if args.action == 'run_server':
     app = create_app(args)
     host = ''.join(args.bind.split(':')[:-1])
     port = int(args.bind.split(':')[-1])
-    if args.mode == 'developer':
+    if args.mode == 'development':
         logging.debug('Launching server in development mode')
         app.run(debug=args.debug, host=host, port=port)
     elif args.mode == 'production':
