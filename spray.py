@@ -37,7 +37,8 @@ logging.basicConfig(format=log_format, level=logging.DEBUG if args.debug else lo
 
 def run_server():
     try:
-        yaml_file = os.path.abspath('spray.yaml')
+        serve_path = os.path.abspath(args.path)
+        yaml_file = os.path.join(serve_path, 'spray.yaml')
         logging.debug('Loading yaml file {filename}'.format(filename=yaml_file))
         with open(yaml_file) as fh:
             conf = yaml.load(fh)
@@ -49,14 +50,14 @@ def run_server():
         sys.exit(1)
 
     mimetypes.init()
-    app = Flask(__name__)
+    app = Flask(__name__, instance_path=serve_path, template_folder=os.path.join(serve_path, 'templates'))
     app.jinja_env.add_extension('pyjade.ext.jinja.PyJadeExtension')
 
     @app.errorhandler(404)
     def not_found(error):
         logging.debug('Handling 404 error')
         for tmpl in ('404.jade', '404.html'):
-            not_found_template = os.path.abspath(os.path.join('templates', tmpl))
+            not_found_template = os.path.abspath(os.path.join(serve_path, 'templates', tmpl))
             if os.path.exists(not_found_template):
                 logging.debug('Using ' + tmpl + ' to serve 404 page')
                 return make_response(render_template(tmpl), 404)
@@ -69,7 +70,7 @@ def run_server():
         hasher = hashlib.new('sha1')
         hasher.update(request.path)
         cache_key = hasher.hexdigest()
-        cache_file = os.path.abspath(os.path.join('cache', cache_key))
+        cache_file = os.path.abspath(os.path.join(serve_path, 'cache', cache_key))
         logging.debug('Checking for cache key "{key}" for request path "{path}"'.format(key=cache_key, path=request.path))
         if os.path.exists(cache_file):
             logging.debug('Found cache key "{key}"'.format(key=cache_key))
@@ -84,7 +85,7 @@ def run_server():
         hasher = hashlib.new('sha1')
         hasher.update(request.path)
         cache_key = hasher.hexdigest()
-        cache_file = os.path.abspath(os.path.join('cache', cache_key))
+        cache_file = os.path.abspath(os.path.join(serve_path, 'cache', cache_key))
         if not os.path.exists(cache_file):
             with open(cache_file, 'w') as fh:
                 fh.write(response.get_data())
@@ -98,13 +99,16 @@ def run_server():
         else:
             template = meta
             name = route
+        def view():
+            logging.debug('Serving request "{path}" with template "{template}"'.format(path=request.path, template=template))
+            return render_template(template)
         logging.debug('Registering route {route} named {name}'.format(route=route, name=name))
-        app.add_url_rule(route, name, lambda: render_template(template))
+        app.add_url_rule(route, name, view)
 
 
     def catchall_view(path):
         logging.debug('Serving request with the catchall_view')
-        static_file = os.path.abspath(os.path.join('static', path))
+        static_file = os.path.abspath(os.path.join(serve_path, 'static', path))
         if not os.path.exists(static_file):
             logging.debug('Did not find static file {filename}'.format(filename=static_file))
             return abort(404)
@@ -122,22 +126,35 @@ def run_server():
         app.run(debug=args.debug, host=host, port=port)
 
 
+def create_file(*args):
+    path = os.path.join(*args[:-1])
+    logging.info('Creating file {filename}'.format(filename=path))
+    with open(path, 'w') as fh:
+        fh.write(args[-1])
+
+
+def create_directory(*args):
+    directory = os.path.join(*args)
+    logging.info('Creating directory {path}'.format(path=directory))
+    os.mkdir(directory)
+    
+
 def create_project():
     dest = os.path.abspath(args.name)
     if os.path.exists(dest):
         logging.error('Project destination {dest} already exists'.format(dest=dest))
         sys.exit(1)
-    logging.info('Creating new project at {dest}'.format(dest=dest))
-    os.mkdir(dest)
-    logging.info('Creating spray.yaml file')
-    with open(os.path.join(dest, 'spray.yaml'), 'w') as fh:
-        fh.write('')
-    logging.info('Creating templates directory')
-    os.mkdir(os.path.join(dest, 'templates'))
-    logging.info('Creating static directory')
-    os.mkdir(os.path.join(dest, 'static'))
-    logging.info('Creating cache directory')
-    os.mkdir(os.path.join(dest, 'cache'))
+    create_directory(dest)
+    create_file(dest, 'spray.yaml', '''
+/:
+    template: home.jade
+    name: home
+    '''.strip())
+    for path in ('templates', 'static', 'cache'):
+        create_directory(dest, path)
+    create_file(dest, 'templates', 'home.jade', 'h1 Hello, World!')
+    create_file(dest, 'templates', '404.jade', 'h1 404 Not Found')
+
 
 if args.action == 'run_server':
     run_server()
