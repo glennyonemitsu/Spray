@@ -9,12 +9,7 @@ import os
 import os.path
 import sys
 
-from flask import abort, Flask, make_response, render_template, request, \
-    send_file
-from gunicorn.app.base import Application
-from gunicorn.app.wsgiapp import WSGIApplication
-from gunicorn.arbiter import Arbiter
-from gunicorn.config import Config
+from flask import abort, Flask, make_response, render_template, request, send_file
 import yaml
 
 
