@@ -55,6 +55,11 @@ def create_app(args):
         logging.error('spray.yaml not proper YAML syntax')
         sys.exit(1)
 
+    # dict of route: mimetype maps, so cache serves can use this to determine 
+    # mimetypes because there are usually no .html extensions for web page 
+    # routes.
+    path_mimetypes = {}
+
     mimetypes.init()
     app = Flask(__name__, instance_path=serve_path, template_folder=os.path.join(serve_path, 'templates'))
     app.jinja_env.add_extension('pyjade.ext.jinja.PyJadeExtension')
@@ -78,10 +83,6 @@ def create_app(args):
         else:
             logging.debug('Serving previously rendered 404 page')
         return missing_output, 404
-        res = make_response(missing_output, 404)
-        res.headers['Content-Type'] = 'text/html'
-        logging.debug(res)
-        return res
 
     @app.before_request
     def missing_checker():
@@ -101,7 +102,12 @@ def create_app(args):
             logging.debug('Checking for cache key "{key}" for request path "{path}"'.format(key=cache_key, path=request.path))
             if os.path.exists(cache_file):
                 logging.debug('Found cache file "{key}"'.format(key=cache_file))
-                return send_file(cache_file, mimetype=mimetypes.guess_type(request.path)[0])
+                mimetype = path_mimetypes.get(request.path, 'application/octet-stream')
+                if request.path in path_mimetypes:
+                    logging.debug('Using noted mimetype "{mimetype}"'.format(mimetype=mimetype))
+                else:
+                    logging.debug('Using default mimetype "{mimetype}"'.format(mimetype=mimetype))
+                return send_file(cache_file, mimetype=mimetype)
             else:
                 logging.debug('Did not find cache key "{key}"'.format(key=cache_key))
         else:
@@ -133,6 +139,7 @@ def create_app(args):
             name = route
         def view():
             logging.debug('Serving request "{path}" with template "{template}"'.format(path=request.path, template=template))
+            path_mimetypes[request.path] = 'text/html'
             return render_template(template)
         logging.debug('Registering route {route} named {name}'.format(route=route, name=name))
         app.add_url_rule(route, name, view)
@@ -144,8 +151,10 @@ def create_app(args):
         if not os.path.exists(static_file):
             logging.debug('Did not find static file {filename}'.format(filename=static_file))
             return abort(404)
+        mimetype = mimetypes.guess_type(request.path)[0]
+        path_mimetypes[request.path] = mimetype
         logging.debug('Found static file {filename}'.format(filename=static_file))
-        return send_file(static_file, mimetype=mimetypes.guess_type(request.path)[0])
+        return send_file(static_file, mimetype=mimetype)
 
     app.add_url_rule('/<path:path>', 'catchall', catchall_view)
     return app
