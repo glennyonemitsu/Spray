@@ -179,7 +179,7 @@ def create_project():
 
 
 def main():
-    if args.action == 'run_server':
+    if args.action == 'run':
         host = ''.join(args.bind.split(':')[:-1])
         port = int(args.bind.split(':')[-1])
         if args.mode == 'development':
@@ -194,7 +194,7 @@ def main():
             logging.debug('Launching server in production mode')
             server = WSGIServer((host, port), app, log=None)
             server.serve_forever()
-    elif args.action == 'create_project':
+    elif args.action == 'create':
         create_project()
 
 if __name__ == '__main__':
