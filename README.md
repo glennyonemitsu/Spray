@@ -42,7 +42,7 @@ at `http://example.com/robots.txt`.
 
 ## Features
 
-Flask powered
+Flask powered. Gevent powered for production mode.
 
 Templating via jade and jinja2 support
 
