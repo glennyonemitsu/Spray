@@ -27,7 +27,7 @@ args_server.add_argument('-b', '--bind', default='localhost:8080', help='Bind se
 args_server.add_argument('-m', '--mode', default='development', choices=['development', 'production'], help='Deployment mode development or production mode')
 args_server.add_argument('-p', '--path', help='Spray path', default=os.getcwd())
 args_server.add_argument('-c', '--cache', help='Use cache for development mode. This is always on for production mode', default=False, action='store_true')
-args_server.set_defaults(action='run_server')
+args_server.set_defaults(action='run')
 
 args_create = subparsers.add_parser('create', help='Create a new Spray project')
 args_create.add_argument('-n', '--name', required=True, help='Project name')
@@ -180,15 +180,17 @@ def create_project():
 
 def main():
     if args.action == 'run_server':
-        app = create_app(args)
         host = ''.join(args.bind.split(':')[:-1])
         port = int(args.bind.split(':')[-1])
         if args.mode == 'development':
+            app = create_app(args)
             logging.debug('Launching server in development mode')
             app.run(debug=args.debug, host=host, port=port)
         elif args.mode == 'production':
             from gevent.wsgi import WSGIServer
 
+            args.cache = True
+            app = create_app(args)
             logging.debug('Launching server in production mode')
             server = WSGIServer((host, port), app, log=None)
             server.serve_forever()
