@@ -1,3 +1,13 @@
+'''
+Spray
+=====
+
+A simple site server with builtin Jade support and caching.
+
+This is not another static site generator, but an actual server aimed at 
+providing developers with a way to very quickly write simple websites.
+'''
+
 from setuptools import setup
 
 setup(
