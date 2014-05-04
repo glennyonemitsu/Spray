@@ -48,12 +48,12 @@ Templating via jade and jinja2 support
 
 Static files
 
-Caching and E-tag
+Caching and (soon) E-tag
 
 
 ## Quick Start
 
-To install (hopefully sometime soon)
+To install
 
     $ pip install spray 
 
@@ -69,9 +69,13 @@ Start a project
 
 Work in development or production mode
 
-    $ spray run_server \
+    $ spray run \
             --mode={development,production} \
             --bind=0.0.0.0:8080
+
+More info available with the `--help` flag
+
+    $ spray --help
 
 
 ## Serving And Caching Under The Hood
