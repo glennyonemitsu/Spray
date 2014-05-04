@@ -38,6 +38,10 @@ args = parser.parse_args()
 log_format = '%(levelname)s: %(message)s'
 logging.basicConfig(format=log_format, level=logging.DEBUG if args.debug else logging.ERROR)
 
+# set of routes that returned a 404, so a cache file does not get created and muck up the file system
+missing = set()
+missing_output = None
+
 def create_app(args):
     try:
         serve_path = os.path.abspath(args.path)
@@ -58,19 +62,39 @@ def create_app(args):
 
     @app.errorhandler(404)
     def not_found(error):
+        global missing
+        global missing_output
         logging.debug('Handling 404 error')
-        for tmpl in ('404.jade', '404.html'):
-            not_found_template = os.path.abspath(os.path.join(serve_path, 'templates', tmpl))
-            if os.path.exists(not_found_template):
-                logging.debug('Using ' + tmpl + ' to serve 404 page')
-                return make_response(render_template(tmpl), 404)
+        missing.add(request.path)
+        if missing_output is None:
+            logging.debug('Rendering the 404 error page for the first time')
+            for tmpl in ('404.jade', '404.html'):
+                not_found_template = os.path.abspath(os.path.join(serve_path, 'templates', tmpl))
+                if os.path.exists(not_found_template):
+                    logging.debug('Using "{tmpl}" to serve 404 page'.format(tmpl=not_found_template))
+                    missing_output = render_template(tmpl)
+            if missing_output is None:
+                logging.debug('Using default 404 string to serve 404 page')
+                missing_output = '404 Not Found'
         else:
-            logging.debug('Using default 404 string to serve 404 page')
-            return '404 Not Found', 404
+            logging.debug('Serving previously rendered 404 page')
+        return missing_output, 404
+        res = make_response(missing_output, 404)
+        res.headers['Content-Type'] = 'text/html'
+        logging.debug(res)
+        return res
+
+    @app.before_request
+    def missing_checker():
+        global missing
+        logging.debug('Checking if the request path "{path}" was already determined to be a 404'.format(path=request.path))
+        if request.path in missing:
+            logging.debug('The request path "{path}" was determined to be a 404'.format(path=request.path))
+            abort(404)
 
     @app.before_request
     def cache_checker():
-        if args.cache:
+        if args.cache and request.path not in missing:
             hasher = hashlib.new('sha1')
             hasher.update(request.path)
             cache_key = hasher.hexdigest()
@@ -86,19 +110,19 @@ def create_app(args):
 
     @app.after_request
     def cache_recorder(response):
-        if args.cache:
-            hasher = hashlib.new('sha1')
-            hasher.update(request.path)
-            cache_key = hasher.hexdigest()
-            cache_file = os.path.abspath(os.path.join(serve_path, 'cache', cache_key))
-            if not os.path.exists(cache_file):
-                response.direct_passthrough = False
-                with open(cache_file, 'w') as fh:
-                    fh.write(response.get_data())
-            return response
-        else:
-            logging.debug('Not saving output for cache')
-            return response
+        if response.status_code != 404:
+            if args.cache:
+                hasher = hashlib.new('sha1')
+                hasher.update(request.path)
+                cache_key = hasher.hexdigest()
+                cache_file = os.path.abspath(os.path.join(serve_path, 'cache', cache_key))
+                if not os.path.exists(cache_file):
+                    response.direct_passthrough = False
+                    with open(cache_file, 'w') as fh:
+                        fh.write(response.get_data())
+            else:
+                logging.debug('Not saving output for cache')
+        return response
 
 
     for route, meta in conf.iteritems():
