@@ -12,6 +12,7 @@ import sys
 from flask import abort, Flask, make_response, render_template, request, \
     send_file
 from gunicorn.app.base import Application
+from gunicorn.app.wsgiapp import WSGIApplication
 from gunicorn.arbiter import Arbiter
 from gunicorn.config import Config
 import yaml
@@ -159,8 +160,13 @@ if args.action == 'run_server':
     host = ''.join(args.bind.split(':')[:-1])
     port = int(args.bind.split(':')[-1])
     if args.mode == 'developer':
+        logging.debug('Launching server in development mode')
         app.run(debug=args.debug, host=host, port=port)
     elif args.mode == 'production':
-        app.run(debug=args.debug, host=host, port=port)
+        from gevent.wsgi import WSGIServer
+
+        logging.debug('Launching server in production mode')
+        server = WSGIServer((host, port), app, log=None)
+        server.serve_forever()
 elif args.action == 'create_project':
     create_project()
