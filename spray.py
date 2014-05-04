@@ -25,6 +25,7 @@ args_server = subparsers.add_parser('run_server', help='run server')
 args_server.add_argument('-b', '--bind', default='localhost:8080', help='bind ip:port')
 args_server.add_argument('-m', '--mode', default='developer', choices=['developer', 'production'], help='developer or production mode')
 args_server.add_argument('-p', '--path', help='spray path', default=os.getcwd())
+args_server.add_argument('-c', '--cache', help='use cache', default=False, action='store_true')
 args_server.set_defaults(action='run_server')
 
 args_create = subparsers.add_parser('create_project', help='create a project')
@@ -36,7 +37,7 @@ args = parser.parse_args()
 log_format = '%(levelname)s: %(message)s'
 logging.basicConfig(format=log_format, level=logging.DEBUG if args.debug else logging.ERROR)
 
-def create_app():
+def create_app(args):
     try:
         serve_path = os.path.abspath(args.path)
         yaml_file = os.path.join(serve_path, 'spray.yaml')
@@ -68,28 +69,35 @@ def create_app():
 
     @app.before_request
     def cache_checker():
-        hasher = hashlib.new('sha1')
-        hasher.update(request.path)
-        cache_key = hasher.hexdigest()
-        cache_file = os.path.abspath(os.path.join(serve_path, 'cache', cache_key))
-        logging.debug('Checking for cache key "{key}" for request path "{path}"'.format(key=cache_key, path=request.path))
-        if os.path.exists(cache_file):
-            logging.debug('Found cache file "{key}"'.format(key=cache_file))
-            return send_file(cache_file, mimetype=mimetypes.guess_type(request.path)[0])
+        if args.cache:
+            hasher = hashlib.new('sha1')
+            hasher.update(request.path)
+            cache_key = hasher.hexdigest()
+            cache_file = os.path.abspath(os.path.join(serve_path, 'cache', cache_key))
+            logging.debug('Checking for cache key "{key}" for request path "{path}"'.format(key=cache_key, path=request.path))
+            if os.path.exists(cache_file):
+                logging.debug('Found cache file "{key}"'.format(key=cache_file))
+                return send_file(cache_file, mimetype=mimetypes.guess_type(request.path)[0])
+            else:
+                logging.debug('Did not find cache key "{key}"'.format(key=cache_key))
         else:
-            logging.debug('Did not find cache key "{key}"'.format(key=cache_key))
+            logging.debug('Not checking for cache')
 
     @app.after_request
     def cache_recorder(response):
-        hasher = hashlib.new('sha1')
-        hasher.update(request.path)
-        cache_key = hasher.hexdigest()
-        cache_file = os.path.abspath(os.path.join(serve_path, 'cache', cache_key))
-        if not os.path.exists(cache_file):
-            response.direct_passthrough = False
-            with open(cache_file, 'w') as fh:
-                fh.write(response.get_data())
-        return response
+        if args.cache:
+            hasher = hashlib.new('sha1')
+            hasher.update(request.path)
+            cache_key = hasher.hexdigest()
+            cache_file = os.path.abspath(os.path.join(serve_path, 'cache', cache_key))
+            if not os.path.exists(cache_file):
+                response.direct_passthrough = False
+                with open(cache_file, 'w') as fh:
+                    fh.write(response.get_data())
+            return response
+        else:
+            logging.debug('Not saving output for cache')
+            return response
 
 
     for route, meta in conf.iteritems():
@@ -147,13 +155,12 @@ def create_project():
 
 
 if args.action == 'run_server':
-    app = create_app()
+    app = create_app(args)
     host = ''.join(args.bind.split(':')[:-1])
     port = int(args.bind.split(':')[-1])
     if args.mode == 'developer':
         app.run(debug=args.debug, host=host, port=port)
     elif args.mode == 'production':
         app.run(debug=args.debug, host=host, port=port)
-
 elif args.action == 'create_project':
     create_project()
