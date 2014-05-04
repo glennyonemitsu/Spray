@@ -7,10 +7,14 @@ import logging
 import mimetypes
 import os
 import os.path
+import shutil
 import sys
 
 from flask import abort, Flask, make_response, render_template, request, send_file
 import yaml
+
+
+__version__ = '0.1'
 
 
 parser = argparse.ArgumentParser()
@@ -185,6 +189,11 @@ def main():
             from gevent.wsgi import WSGIServer
 
             args.cache = True
+            cache_path = os.path.abspath(os.path.join(args.path, 'cache'))
+            logging.debug('Clearing cache directory {path}'.format(path=cache_path))
+            if os.path.exists(cache_path):
+                shutil.rmtree(cache_path)
+            create_directory(cache_path)
             app = create_app(args)
             logging.debug('Launching server in production mode')
             server = WSGIServer((host, port), app, log=None)
