@@ -6,7 +6,7 @@ Simple static site framework
 
 ## Features
 
-Flask powered. Gevent powered for production mode.
+Flask powered. Gevent (if installed) powered for production mode.
 
 Templating via jade and jinja2 support
 
