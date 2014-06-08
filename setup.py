@@ -12,7 +12,7 @@ from setuptools import setup
 
 setup(
     name='Spray',
-    version='0.1',
+    version='0.3',
     url='http://github.com/glennyonemitsu/Spray/',
     license='MIT',
     author='Glenn Yonemitsu',
@@ -25,7 +25,6 @@ setup(
     platforms='any',
     install_requires=[
         'flask',
-        'gevent',
         'pyjade',
         'pyyaml',
     ],

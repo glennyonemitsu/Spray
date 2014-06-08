@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import logging
 import mimetypes
+import multiprocessing
 import os
 import os.path
 import shutil
@@ -14,7 +15,7 @@ from flask import abort, Flask, make_response, render_template, request, send_fi
 import yaml
 
 
-__version__ = '0.1'
+__version__ = '0.3'
 
 
 parser = argparse.ArgumentParser()
@@ -195,8 +196,6 @@ def main():
             logging.debug('Launching server in development mode')
             app.run(debug=args.debug, host=host, port=port)
         elif args.mode == 'production':
-            from gevent.wsgi import WSGIServer
-
             args.cache = True
             cache_path = os.path.abspath(os.path.join(args.path, 'cache'))
             logging.debug('Clearing cache directory {path}'.format(path=cache_path))
@@ -204,11 +203,18 @@ def main():
                 shutil.rmtree(cache_path)
             create_directory(cache_path)
             app = create_app(args)
-            logging.debug('Launching server in production mode')
-            server = WSGIServer((host, port), app, log=None)
-            server.serve_forever()
+            try:
+                from gevent.wsgi import WSGIServer
+                logging.debug('Launching server in production mode with gevent')
+                server = WSGIServer((host, port), app, log=None)
+                server.serve_forever()
+            except ImportError:
+                logging.debug('Launching server in production mode without gevent')
+                app.run(host=host, port=port)
+
     elif args.action == 'create':
         create_project()
+
 
 if __name__ == '__main__':
     main()
