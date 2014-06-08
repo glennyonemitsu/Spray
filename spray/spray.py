@@ -15,7 +15,9 @@ from flask import abort, Flask, make_response, render_template, request, send_fi
 import yaml
 
 
-__version__ = '0.3'
+__version__ = '0.4'
+
+PROC_TITLE_DEFAULT = 'Spray Server'
 
 
 parser = argparse.ArgumentParser()
@@ -23,6 +25,7 @@ parser.add_argument('-d', '--debug', help='debugging output', action='store_true
 subparsers = parser.add_subparsers(help='Spray command actions')
 
 args_server = subparsers.add_parser('run', help='Run the web server')
+args_server.add_argument('-n', '--name', default=PROC_TITLE_DEFAULT, help='Process title to set. Useful to differentiate multiple Spray Server instances')
 args_server.add_argument('-b', '--bind', default='localhost:8080', help='Bind server to ip:port')
 args_server.add_argument('-m', '--mode', default='development', choices=['development', 'production'], help='Deployment mode development or production mode')
 args_server.add_argument('-p', '--path', help='Spray path', default=os.getcwd())
@@ -191,6 +194,14 @@ def main():
     if args.action == 'run':
         host = ''.join(args.bind.split(':')[:-1])
         port = int(args.bind.split(':')[-1])
+        if args.name != PROC_TITLE_DEFAULT:
+            try:
+                import setproctitle
+                proc_title = 'Spray Server: ' + args.name
+                setproctitle.setproctitle(proc_title)
+                logging.debug('Using custom process title ' + proc_title)
+            except ImportError:
+                logging.debug('Could not set process title as specified. Python module "setproctitle" required')
         if args.mode == 'development':
             app = create_app(args)
             logging.debug('Launching server in development mode')
